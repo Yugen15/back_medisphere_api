@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Receta;
+use App\Models\Consulta;
+use App\Models\Paciente;
+use App\Models\Medico;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -162,54 +165,42 @@ class RecetaController extends Controller
             ], 500);
         }
     }
-    public function generateReport($id)
+
+    public function generarReportePDF($pacienteId): Response
     {
         try {
-            // Obtener recetas, detalles del paciente y médico
-            $recetas = DB::table('pacientes AS p')
-                ->join('citas AS c', 'p.id', '=', 'c.paciente_id')
-                ->join('consultas AS consulta', 'consulta.id_cita', '=', 'c.id')
-                ->join('recetas AS receta', 'receta.id_consulta', '=', 'consulta.id')
-                ->join('medicos AS medico', 'medico.id', '=', 'c.doctor_id')
+            $datos = DB::table('recetas as receta')
+                ->join('consultas as consulta', 'receta.id_consulta', '=', 'consulta.id')
+                ->join('citas as c', 'consulta.id_cita', '=', 'c.id')
+                ->join('pacientes as p', 'p.id', '=', 'c.paciente_id')
+                ->join('medicos as medico', 'medico.id', '=', 'c.doctor_id')
                 ->select(
-                    'p.nombre AS nombre_paciente',
-                    'p.apellido AS apellido_paciente',
-                    'medico.nombre AS nombre_medico',
-                    'medico.apellido AS apellido_medico',
-                    'consulta.fecha AS fecha_consulta',
+                    'p.nombre as nombre_paciente',
+                    'p.apellido as apellido_paciente',
+                    'medico.nombre as nombre_medico',
+                    'medico.apellido as apellido_medico',
+                    'consulta.fecha as fecha_consulta',
                     'receta.medicamento',
                     'receta.dosis'
                 )
-                ->where('p.id', $id)
+                ->where('p.id', $pacienteId)
                 ->orderBy('consulta.fecha', 'DESC')
                 ->get();
 
-            if ($recetas->isEmpty()) {
-                return response()->json(['message' => 'No se encontraron recetas para este paciente'], 404);
+            if ($datos->isEmpty()) {
+                return response()->json([
+                    'message' => 'No hay recetas disponibles para este paciente'
+                ], 404);
             }
 
-            // Generar el PDF
-            $pdf = PDF::loadView('recetas_por_paciente', compact('recetas'));
+            $pdf = PDF::loadView('receta.reporte', compact('datos'));
 
-            // Configurar headers específicos para la descarga del PDF
-            return $pdf->stream('recetas_paciente_' . $id . '.pdf', [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="recetas_paciente_' . $id . '.pdf"',
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
-                'Pragma' => 'no-cache',
-                'Expires' => '0'
-            ]);
+            return $pdf->download('reporte-recetas-' . $datos[0]->nombre_paciente . '.pdf');
         } catch (\Exception $e) {
-            Log::error('Error generando reporte de recetas:', [
-                'patient_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
             return response()->json([
-                'message' => 'Error al generar el PDF',
+                'message' => 'Error al generar el reporte',
                 'error' => $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            ], 500);
         }
     }
 }
