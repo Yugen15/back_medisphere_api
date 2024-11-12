@@ -26,6 +26,8 @@ Route::get('/consultas/medico/pdf/{id}', [MedicoController::class, 'generarPDFCo
 
 //Reporte por paciente y fecha
 Route::get('recetas/reporte/{pacienteId}', [RecetaController::class, 'generarReportePDF']);
+// En routes/api.php, dentro del grupo de rutas protegidas
+Route::get('/examenes/reporte/{id}', [ExameneController::class, 'generateReport']);
 
 
 
