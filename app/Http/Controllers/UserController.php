@@ -9,89 +9,202 @@ use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
-    // Obtener todos los usuarios
-    public function index()
+    public function select()
     {
-        $users = User::all();
-        return response()->json($users, 200);
-    }
+        try {
+            $users = User::select(
+                'users.id',
+                'users.name',
+                'users.email',
+                'users.role_id', // Añadir role_id a la selección
+                'roles.name as role_name'
+            )
+                ->join('roles', 'users.role_id', '=', 'roles.id')
+                ->get();
 
-    // Obtener un usuario por ID
-    public function show($id)
-    {
-        $user = User::find($id);
-
-        if (!$user) {
-            return response()->json(['message' => 'Usuario no encontrado'], 404);
+            return response()->json([
+                'code' => 200,
+                'data' => $users
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'code' => 500,
+                'message' => $th->getMessage()
+            ], 500);
         }
-
-        return response()->json($user, 200);
     }
 
-    // Crear un nuevo usuario
+
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:6',
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required',
+                'email' => 'required|email|unique:users',
+                'password' => 'required|min:6',
+                'role_id' => 'required|exists:roles,id'
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 400);
+            if ($validator->fails()) {
+                return response()->json([
+                    'code' => 422,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $userData = $request->all();
+            $userData['password'] = Hash::make($request->password);
+
+            $user = User::create($userData);
+
+            return response()->json([
+                'code' => 201,
+                'message' => 'Usuario creado exitosamente',
+                'data' => $user
+            ], 201);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'code' => 500,
+                'message' => $th->getMessage()
+            ], 500);
         }
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password), // Encriptar la contraseña
-        ]);
-
-        return response()->json($user, 201); // 201: Recurso creado
     }
 
-    // Actualizar un usuario existente
+    public function show($id)
+    {
+        try {
+            $user = User::select(
+                'users.id',
+                'users.name',
+                'users.email',
+                'users.role_id',
+                'roles.name as role_name'
+            )
+                ->join('roles', 'users.role_id', '=', 'roles.id')
+                ->where('users.id', $id)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'code' => 404,
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'code' => 200,
+                'data' => $user
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'code' => 500,
+                'message' => $th->getMessage()
+            ], 500);
+        }
+    }
+
     public function update(Request $request, $id)
     {
-        $user = User::find($id);
+        try {
+            $user = User::find($id);
 
-        if (!$user) {
-            return response()->json(['message' => 'Usuario no encontrado'], 404);
+            if (!$user) {
+                return response()->json([
+                    'code' => 404,
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name' => 'required',
+                'email' => 'required|email|unique:users,email,' . $id,
+                'role_id' => 'required|exists:roles,id',
+                'password' => 'sometimes|min:6'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'code' => 422,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $userData = $request->except('password');
+            if ($request->filled('password')) {
+                $userData['password'] = Hash::make($request->password);
+            }
+
+            $user->update($userData);
+
+            return response()->json([
+                'code' => 200,
+                'message' => 'Usuario actualizado exitosamente',
+                'data' => $user
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'code' => 500,
+                'message' => $th->getMessage()
+            ], 500);
         }
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $id,
-            'password' => 'nullable|string|min:6',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 400);
-        }
-
-        // Si se proporciona una nueva contraseña, encriptarla
-        if ($request->has('password')) {
-            $user->password = Hash::make($request->password);
-        }
-
-        // Actualizar otros campos
-        $user->name = $request->name;
-        $user->email = $request->email;
-        $user->save();
-
-        return response()->json($user, 200);
     }
 
-    // Eliminar un usuario
+    public function find($id) // Añadir este método si no existe
+    {
+        try {
+            $user = User::select(
+                'users.id',
+                'users.name',
+                'users.email',
+                'users.role_id',
+                'roles.name as role_name'
+            )
+                ->join('roles', 'users.role_id', '=', 'roles.id')
+                ->where('users.id', $id)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'code' => 404,
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            return response()->json([
+                'code' => 200,
+                'data' => $user
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'code' => 500,
+                'message' => $th->getMessage()
+            ], 500);
+        }
+    }
+
     public function destroy($id)
     {
-        $user = User::find($id);
+        try {
+            $user = User::find($id);
 
-        if (!$user) {
-            return response()->json(['message' => 'Usuario no encontrado'], 404);
+            if (!$user) {
+                return response()->json([
+                    'code' => 404,
+                    'message' => 'Usuario no encontrado'
+                ], 404);
+            }
+
+            $user->delete();
+
+            return response()->json([
+                'code' => 200,
+                'message' => 'Usuario eliminado exitosamente'
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'code' => 500,
+                'message' => $th->getMessage()
+            ], 500);
         }
-
-        $user->delete();
-        return response()->json(['message' => 'Usuario eliminado con éxito'], 200);
     }
 }
