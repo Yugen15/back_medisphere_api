@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Http\Request;
-use App\Http\Controllers\RoleController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EspecialidadeController;
@@ -17,7 +16,7 @@ use App\Http\Controllers\ExameneController;
 
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
-
+Route::resource('users', UserController::class)->except(['create', 'edit']); //crud para usuarios
 
 //Para el reporte de paciente
 Route::get('paciente/reporte/{id}', [PacienteController::class, 'generateReport'])->name('paciente.reporte');
@@ -31,18 +30,10 @@ Route::get('recetas/reporte/{pacienteId}', [RecetaController::class, 'generarRep
 Route::get('/examenes/reporte/{id}', [ExameneController::class, 'generateReport']);
 
 
-Route::get('/users/select', [UserController::class, 'select']);
-Route::post('/users/store', [UserController::class, 'store']);
-Route::put('/users/update/{id}', [UserController::class, 'update']);
-Route::delete('/users/destroy/{id}', [UserController::class, 'destroy']);
-Route::get('/users/find/{id}', [UserController::class, 'find']);
-Route::get('/roles/select', [RoleController::class, 'select']);
 
 
 // Rutas protegidas (requieren autenticación)
 Route::group(['middleware' => 'auth:sanctum'], function () {
-
-
 
     // Logout de la API
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -91,15 +82,4 @@ Route::group(['middleware' => 'auth:sanctum'], function () {
     Route::post('/examenes', [ExameneController::class, 'store']);
     Route::put('/examenes/{id}', [ExameneController::class, 'update']);
     Route::delete('/examenes/{id}', [ExameneController::class, 'destroy']);
-
-
-
-    //Roles
-    // In routes/api.php, update the roles routes within the auth:sanctum middleware group
-
-    Route::get('roles', [RoleController::class, 'index']);
-    Route::post('roles', [RoleController::class, 'store']);  // Changed from roles/create
-    Route::put('roles/{id}', [RoleController::class, 'update']);  // Changed from roles/update/{id}
-    Route::delete('roles/{id}', [RoleController::class, 'delete']);  // Changed from roles/delete/{id}
-    Route::get('roles/{id}', [RoleController::class, 'find']);  // Changed from roles/find/{id}
 });
